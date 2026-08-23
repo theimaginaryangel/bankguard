@@ -4,7 +4,7 @@ import { useEffect, useState, useRef } from "react";
 import { fetchFindings, uploadFileSecurely, checkJobStatus } from "@/lib/api";
 
 export default function FraudPage() {
-  const [findings, setFindings] = useState<unknown[]>([]);
+  const [findings, setFindings] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [uploading, setUploading] = useState(false);
   const [uploadStatus, setUploadStatus] = useState("");
