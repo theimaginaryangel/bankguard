@@ -1,0 +1,55 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Transform: AWS::Serverless-2016-10-31
+Description: >
+  API Layer — A simple "digital teller" that safely reads findings 
+  from DynamoDB and gives them to our Next.js website.
+
+Parameters:
+  FindingsTableName:
+    Type: String
+    Default: Findings
+    Description: The name of our shared DynamoDB table where alerts are saved.
+  UploadBucketName:
+    Type: String
+    Description: The name of the S3 bucket created by the Fraud Monitor for batch uploads.
+
+Resources:
+
+  FindingsApi:
+    Type: AWS::Serverless::Api
+    Properties:
+      StageName: Prod
+      Cors:
+        AllowMethods: "'GET,POST,OPTIONS'"
+        AllowHeaders: "'Content-Type'"
+        AllowOrigin: "'*'"
+
+  ApiHandlerFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      Handler: app.lambda_handler
+      CodeUri: src/
+      Runtime: python3.12
+      Timeout: 10
+      Environment:
+        Variables:
+          FINDINGS_TABLE_NAME: !Ref FindingsTableName
+          UPLOAD_BUCKET_NAME: !Ref UploadBucketName
+      Policies:
+        - DynamoDBReadPolicy:
+            TableName: !Ref FindingsTableName
+        # Give our teller permission to generate upload tickets for the S3 bucket
+        - S3WritePolicy:
+            BucketName: !Ref UploadBucketName
+      Events:
+        ApiEvent:
+          Type: Api
+          Properties:
+            Path: /{proxy+} 
+            Method: ANY # Changed to ANY to support POST for /upload-url
+            RestApiId: !Ref FindingsApi
+
+Outputs:
+  ApiUrl:
+    Description: "The public URL for your API. Give this to the Next.js frontend!"
+    Value: !Sub "https://${FindingsApi}.execute-api.${AWS::Region}.amazonaws.com/Prod/"

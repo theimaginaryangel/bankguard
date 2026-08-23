@@ -1,0 +1,379 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Transform: AWS::Serverless-2016-10-31
+Description: >
+  Compliance Auditor — scheduled Lambda checks against this AWS account,
+  writing findings to the shared Findings table.
+
+Globals:
+  Function:
+    Runtime: python3.12
+    Timeout: 30
+    MemorySize: 128
+    Environment:
+      Variables:
+        FINDINGS_TABLE_NAME: !Ref FindingsTable
+
+Resources:
+
+  FindingsTable:
+    Type: AWS::DynamoDB::Table
+    Properties:
+      TableName: Findings
+      BillingMode: PAY_PER_REQUEST
+      AttributeDefinitions:
+        - AttributeName: findingType
+          AttributeType: S
+        - AttributeName: findingId
+          AttributeType: S
+        - AttributeName: severity
+          AttributeType: S
+      KeySchema:
+        - AttributeName: findingType
+          KeyType: HASH
+        - AttributeName: findingId
+          KeyType: RANGE
+      GlobalSecondaryIndexes:
+        - IndexName: severity-index
+          KeySchema:
+            - AttributeName: severity
+              KeyType: HASH
+            - AttributeName: findingId
+              KeyType: RANGE
+          Projection:
+            ProjectionType: ALL
+
+  # --- Check: CIS-1.2 — Root account has MFA enabled ---
+  RootMfaCheckFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      Handler: checks.root_mfa_check.handler
+      CodeUri: src/
+      Description: "CIS-1.2 — verifies MFA is enabled on the root account"
+      Policies:
+        - DynamoDBCrudPolicy:
+            TableName: !Ref FindingsTable
+        - Statement:
+            - Effect: Allow
+              Action:
+                - iam:GetAccountSummary
+              Resource: "*"
+      Events:
+        ScheduledCheck:
+          Type: Schedule
+          Properties:
+            # Every 6 hours. Adjust once you know your account's actual change frequency.
+            Schedule: rate(6 hours)
+            Name: RootMfaCheckSchedule
+            Description: Runs the root MFA compliance check every 6 hours
+            Enabled: true
+
+  RootAccessKeysCheckFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      Handler: checks.root_access_keys_check.handler
+      CodeUri: src/
+      Description: "CIS-1.1 - Root account has no active access keys"
+      Policies:
+        - DynamoDBCrudPolicy:
+            TableName: !Ref FindingsTable
+        - Statement:
+            - Effect: Allow
+              Action:
+                - iam:GetAccountSummary
+              Resource: "*"
+      Events:
+        ScheduledCheck:
+          Type: Schedule
+          Properties:
+            Schedule: rate(6 hours)
+            Name: RootAccessKeysCheckSchedule
+            Description: "Runs CIS-1.1 - Root account has no active access keys"
+            Enabled: true
+
+  IamMfaCheckFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      Handler: checks.iam_mfa_check.handler
+      CodeUri: src/
+      Description: "CIS-1.3 - IAM users with console access have MFA enabled"
+      Policies:
+        - DynamoDBCrudPolicy:
+            TableName: !Ref FindingsTable
+        - Statement:
+            - Effect: Allow
+              Action:
+                - iam:ListUsers
+                - iam:GetLoginProfile
+                - iam:ListMFADevices
+              Resource: "*"
+      Events:
+        ScheduledCheck:
+          Type: Schedule
+          Properties:
+            Schedule: rate(6 hours)
+            Name: IamMfaCheckSchedule
+            Description: "Runs CIS-1.3 - IAM users with console access have MFA enabled"
+            Enabled: true
+
+  IamKeyRotationCheckFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      Handler: checks.iam_key_rotation_check.handler
+      CodeUri: src/
+      Description: "CIS-1.4 - IAM access keys rotated within 90 days"
+      Policies:
+        - DynamoDBCrudPolicy:
+            TableName: !Ref FindingsTable
+        - Statement:
+            - Effect: Allow
+              Action:
+                - iam:ListUsers
+                - iam:ListAccessKeys
+              Resource: "*"
+      Events:
+        ScheduledCheck:
+          Type: Schedule
+          Properties:
+            Schedule: rate(6 hours)
+            Name: IamKeyRotationCheckSchedule
+            Description: "Runs CIS-1.4 - IAM access keys rotated within 90 days"
+            Enabled: true
+
+  IamAdminPolicyCheckFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      Handler: checks.iam_admin_policy_check.handler
+      CodeUri: src/
+      Description: "CIS-1.5 - No IAM policies with full admin access attached directly"
+      Policies:
+        - DynamoDBCrudPolicy:
+            TableName: !Ref FindingsTable
+        - Statement:
+            - Effect: Allow
+              Action:
+                - iam:GetAccountAuthorizationDetails
+              Resource: "*"
+      Events:
+        ScheduledCheck:
+          Type: Schedule
+          Properties:
+            Schedule: rate(6 hours)
+            Name: IamAdminPolicyCheckSchedule
+            Description: "Runs CIS-1.5 - No IAM policies with full admin access attached directly"
+            Enabled: true
+
+  S3PublicAccessCheckFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      Handler: checks.s3_public_access_check.handler
+      CodeUri: src/
+      Description: "CIS-2.1 - S3 buckets are not publicly readable/writable"
+      Policies:
+        - DynamoDBCrudPolicy:
+            TableName: !Ref FindingsTable
+        - Statement:
+            - Effect: Allow
+              Action:
+                - s3:ListAllMyBuckets
+                - s3:GetBucketPublicAccessBlock
+              Resource: "*"
+      Events:
+        ScheduledCheck:
+          Type: Schedule
+          Properties:
+            Schedule: rate(6 hours)
+            Name: S3PublicAccessCheckSchedule
+            Description: "Runs CIS-2.1 - S3 buckets are not publicly readable/writable"
+            Enabled: true
+
+  S3EncryptionCheckFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      Handler: checks.s3_encryption_check.handler
+      CodeUri: src/
+      Description: "CIS-2.2 - S3 buckets have encryption at rest enabled"
+      Policies:
+        - DynamoDBCrudPolicy:
+            TableName: !Ref FindingsTable
+        - Statement:
+            - Effect: Allow
+              Action:
+                - s3:ListAllMyBuckets
+                - s3:GetEncryptionConfiguration
+              Resource: "*"
+      Events:
+        ScheduledCheck:
+          Type: Schedule
+          Properties:
+            Schedule: rate(6 hours)
+            Name: S3EncryptionCheckSchedule
+            Description: "Runs CIS-2.2 - S3 buckets have encryption at rest enabled"
+            Enabled: true
+
+  CloudTrailEnabledCheckFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      Handler: checks.cloudtrail_enabled_check.handler
+      CodeUri: src/
+      Description: "CIS-2.3 - CloudTrail is enabled in all regions"
+      Policies:
+        - DynamoDBCrudPolicy:
+            TableName: !Ref FindingsTable
+        - Statement:
+            - Effect: Allow
+              Action:
+                - cloudtrail:DescribeTrails
+                - cloudtrail:GetTrailStatus
+              Resource: "*"
+      Events:
+        ScheduledCheck:
+          Type: Schedule
+          Properties:
+            Schedule: rate(6 hours)
+            Name: CloudTrailEnabledCheckSchedule
+            Description: "Runs CIS-2.3 - CloudTrail is enabled in all regions"
+            Enabled: true
+
+  CloudTrailEncryptionCheckFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      Handler: checks.cloudtrail_encryption_check.handler
+      CodeUri: src/
+      Description: "CIS-2.4 - CloudTrail logs are encrypted"
+      Policies:
+        - DynamoDBCrudPolicy:
+            TableName: !Ref FindingsTable
+        - Statement:
+            - Effect: Allow
+              Action:
+                - cloudtrail:DescribeTrails
+              Resource: "*"
+      Events:
+        ScheduledCheck:
+          Type: Schedule
+          Properties:
+            Schedule: rate(6 hours)
+            Name: CloudTrailEncryptionCheckSchedule
+            Description: "Runs CIS-2.4 - CloudTrail logs are encrypted"
+            Enabled: true
+
+  SgUnrestrictedIngressCheckFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      Handler: checks.sg_unrestricted_ingress_check.handler
+      CodeUri: src/
+      Description: "CIS-3.1 - Security groups dont allow unrestricted ingress on 22/3389"
+      Policies:
+        - DynamoDBCrudPolicy:
+            TableName: !Ref FindingsTable
+        - Statement:
+            - Effect: Allow
+              Action:
+                - ec2:DescribeSecurityGroups
+              Resource: "*"
+      Events:
+        ScheduledCheck:
+          Type: Schedule
+          Properties:
+            Schedule: rate(6 hours)
+            Name: SgUnrestrictedIngressCheckSchedule
+            Description: "Runs CIS-3.1 - Security groups dont allow unrestricted ingress on 22/3389"
+            Enabled: true
+
+  SgDefaultTrafficCheckFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      Handler: checks.sg_default_traffic_check.handler
+      CodeUri: src/
+      Description: "CIS-3.2 - Default security group restricts all traffic"
+      Policies:
+        - DynamoDBCrudPolicy:
+            TableName: !Ref FindingsTable
+        - Statement:
+            - Effect: Allow
+              Action:
+                - ec2:DescribeSecurityGroups
+              Resource: "*"
+      Events:
+        ScheduledCheck:
+          Type: Schedule
+          Properties:
+            Schedule: rate(6 hours)
+            Name: SgDefaultTrafficCheckSchedule
+            Description: "Runs CIS-3.2 - Default security group restricts all traffic"
+            Enabled: true
+
+  EbsEncryptionCheckFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      Handler: checks.ebs_encryption_check.handler
+      CodeUri: src/
+      Description: "CIS-4.1 - EBS volumes are encrypted"
+      Policies:
+        - DynamoDBCrudPolicy:
+            TableName: !Ref FindingsTable
+        - Statement:
+            - Effect: Allow
+              Action:
+                - ec2:DescribeVolumes
+              Resource: "*"
+      Events:
+        ScheduledCheck:
+          Type: Schedule
+          Properties:
+            Schedule: rate(6 hours)
+            Name: EbsEncryptionCheckSchedule
+            Description: "Runs CIS-4.1 - EBS volumes are encrypted"
+            Enabled: true
+
+Outputs:
+  FindingsTableName:
+    Description: Name of the shared Findings table
+    Value: !Ref FindingsTable
+  RootMfaCheckFunctionArn:
+    Description: ARN of the root MFA check Lambda
+    Value: !GetAtt RootMfaCheckFunction.Arn
+
+  RootAccessKeysCheckFunctionArn:
+    Description: ARN of the RootAccessKeysCheck Lambda
+    Value: !GetAtt RootAccessKeysCheckFunction.Arn
+
+  IamMfaCheckFunctionArn:
+    Description: ARN of the IamMfaCheck Lambda
+    Value: !GetAtt IamMfaCheckFunction.Arn
+
+  IamKeyRotationCheckFunctionArn:
+    Description: ARN of the IamKeyRotationCheck Lambda
+    Value: !GetAtt IamKeyRotationCheckFunction.Arn
+
+  IamAdminPolicyCheckFunctionArn:
+    Description: ARN of the IamAdminPolicyCheck Lambda
+    Value: !GetAtt IamAdminPolicyCheckFunction.Arn
+
+  S3PublicAccessCheckFunctionArn:
+    Description: ARN of the S3PublicAccessCheck Lambda
+    Value: !GetAtt S3PublicAccessCheckFunction.Arn
+
+  S3EncryptionCheckFunctionArn:
+    Description: ARN of the S3EncryptionCheck Lambda
+    Value: !GetAtt S3EncryptionCheckFunction.Arn
+
+  CloudTrailEnabledCheckFunctionArn:
+    Description: ARN of the CloudTrailEnabledCheck Lambda
+    Value: !GetAtt CloudTrailEnabledCheckFunction.Arn
+
+  CloudTrailEncryptionCheckFunctionArn:
+    Description: ARN of the CloudTrailEncryptionCheck Lambda
+    Value: !GetAtt CloudTrailEncryptionCheckFunction.Arn
+
+  SgUnrestrictedIngressCheckFunctionArn:
+    Description: ARN of the SgUnrestrictedIngressCheck Lambda
+    Value: !GetAtt SgUnrestrictedIngressCheckFunction.Arn
+
+  SgDefaultTrafficCheckFunctionArn:
+    Description: ARN of the SgDefaultTrafficCheck Lambda
+    Value: !GetAtt SgDefaultTrafficCheckFunction.Arn
+
+  EbsEncryptionCheckFunctionArn:
+    Description: ARN of the EbsEncryptionCheck Lambda
+    Value: !GetAtt EbsEncryptionCheckFunction.Arn

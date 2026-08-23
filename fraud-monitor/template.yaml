@@ -1,0 +1,66 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Transform: AWS::Serverless-2016-10-31
+Description: >
+  Fraud Monitor — A system that looks at batches of credit card transactions 
+  and flags suspicious ones using simple rules and Artificial Intelligence (AI).
+
+Parameters:
+  FindingsTableName:
+    Type: String
+    Default: Findings
+    Description: The name of our shared DynamoDB table where we save alerts.
+
+Resources:
+
+  # 1. An SNS Topic. This is like a megaphone. When we find a CRITICAL fraud alert,
+  # we shout it into this megaphone, and anyone subscribed (like an email address) gets notified.
+  FraudAlertsTopic:
+    Type: AWS::SNS::Topic
+
+  # 2. An S3 Bucket. This is our "inbox" folder in the cloud. We drop CSV files of 
+  # transactions here, and it triggers our Lambda function to read them.
+  TransactionBatchesBucket:
+    Type: AWS::S3::Bucket
+
+  # 3. Our Lambda Function. This is our "worker" that runs our Python code.
+  FraudBatchProcessorFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      Handler: handler.lambda_handler
+      Runtime: python3.12
+      CodeUri: src/
+      Description: "Reads transactions from S3, checks for fraud, and saves findings."
+      # Machine learning needs a bit more memory and time to run than simple checks
+      MemorySize: 512 
+      Timeout: 60
+      Environment:
+        Variables:
+          FINDINGS_TABLE_NAME: !Ref FindingsTableName
+          SNS_TOPIC_ARN: !Ref FraudAlertsTopic
+      Policies:
+        # Give our worker permission to read the files we dropped in the S3 bucket
+        # Using a raw statement to avoid a CloudFormation circular dependency with the Bucket resource
+        - Statement:
+            - Effect: Allow
+              Action:
+                - s3:GetObject
+                - s3:ListBucket
+              Resource: "*"
+        # Give our worker permission to write notes (findings) to our database table
+        - DynamoDBCrudPolicy:
+            TableName: !Ref FindingsTableName
+        # Give our worker permission to shout into the megaphone (SNS)
+        - SNSPublishMessagePolicy:
+            TopicName: !GetAtt FraudAlertsTopic.TopicName
+      Events:
+        # This tells AWS: "Whenever a new file is dropped into the bucket, wake up the worker!"
+        FileUpload:
+          Type: S3
+          Properties:
+            Bucket: !Ref TransactionBatchesBucket
+            Events: s3:ObjectCreated:*
+
+Outputs:
+  BucketName:
+    Description: "Upload your transaction CSVs here"
+    Value: !Ref TransactionBatchesBucket

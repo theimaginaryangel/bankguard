@@ -1,0 +1,5 @@
+# boto3 ships pre-installed in the Lambda python3.12 runtime — not listed
+# here deliberately, to avoid bloating the deployment package with a
+# duplicate copy. Add third-party dependencies here as later checks need
+# them (e.g. `python-ulid` if the timestamp-based ID in common/findings.py
+# needs to become a real ULID for cross-system ID exchange).
