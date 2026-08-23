@@ -105,7 +105,16 @@ export default function FraudPage() {
         
         {/* Upload Zone */}
         <div className="bg-[#0a0a0a] border border-zinc-800 p-4 rounded-xl min-w-[300px]">
-          <h3 className="text-[10px] font-mono text-zinc-500 tracking-widest uppercase mb-3">Upload Transaction Batch (CSV)</h3>
+          <div className="flex items-center justify-between mb-3">
+            <h3 className="text-[10px] font-mono text-zinc-500 tracking-widest uppercase">Upload Transaction Batch (CSV)</h3>
+            <a 
+              href="/sample_transactions.csv" 
+              download 
+              className="text-[10px] font-mono text-emerald-500 hover:text-emerald-400 border border-emerald-500/20 bg-emerald-500/10 px-2 py-1 rounded transition-colors"
+            >
+              Demo Dataset &darr;
+            </a>
+          </div>
           <input 
             type="file" 
             accept=".csv"
