@@ -61,6 +61,22 @@ def lambda_handler(event, context):
             data = get_stats_summary()
             return build_response(200, data, headers)
             
+        elif path.startswith("/job-status/"):
+            # The frontend wants to know how far along the Lambda is in processing a large file!
+            job_id = path.split("/")[-1]
+            response = _dynamodb.get_item(
+                TableName=TABLE_NAME,
+                Key={
+                    "findingType": {"S": "JOB_PROGRESS"},
+                    "findingId": {"S": job_id}
+                }
+            )
+            item = response.get('Item')
+            if item:
+                return build_response(200, clean_dynamo_item(item), headers)
+            else:
+                return build_response(404, {"error": "Job not started yet"}, headers)
+
         elif path == "/upload-url" and event.get("httpMethod") == "POST":
             # Secure S3 Upload! The frontend is asking for a ticket to upload a file.
             body = json.loads(event.get("body", "{}"))

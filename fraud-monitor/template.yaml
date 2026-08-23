@@ -44,8 +44,8 @@ Resources:
       CodeUri: src/
       Description: "Reads transactions from S3, checks for fraud, and saves findings."
       # Machine learning needs a bit more memory and time to run than simple checks
-      MemorySize: 512 
-      Timeout: 60
+      MemorySize: 1024 
+      Timeout: 900
       Environment:
         Variables:
           FINDINGS_TABLE_NAME: !Ref FindingsTableName

@@ -1,16 +1,19 @@
 "use client";
 
 import { useEffect, useState, useRef } from "react";
-import { fetchFindings, uploadFileSecurely } from "@/lib/api";
+import { fetchFindings, uploadFileSecurely, checkJobStatus } from "@/lib/api";
 
 export default function FraudPage() {
-  const [findings, setFindings] = useState<any[]>([]);
+  const [findings, setFindings] = useState<unknown[]>([]);
   const [loading, setLoading] = useState(true);
   const [uploading, setUploading] = useState(false);
   const [uploadStatus, setUploadStatus] = useState("");
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const [uploadProgress, setUploadProgress] = useState(0);
+  const [processingProgress, setProcessingProgress] = useState(0);
+  const [processingStatus, setProcessingStatus] = useState("");
+  const [jobId, setJobId] = useState("");
 
   useEffect(() => {
     async function load() {
@@ -20,6 +23,34 @@ export default function FraudPage() {
     }
     load();
   }, []);
+
+  useEffect(() => {
+    if (!jobId) return;
+
+    const interval = setInterval(async () => {
+      const status = await checkJobStatus(jobId);
+      if (status) {
+        const processed = Number(status.processedBytes || 0);
+        const total = Number(status.totalBytes || 1);
+        const percent = Math.round((processed / total) * 100);
+        setProcessingProgress(percent);
+        
+        if (status.status === "COMPLETED" || percent >= 100) {
+          setProcessingStatus(`Backend Processing Complete! (100%)`);
+          clearInterval(interval);
+          setJobId("");
+          
+          // Reload the table so the user sees the new findings!
+          const data = await fetchFindings("FRAUD");
+          setFindings(data);
+        } else {
+          setProcessingStatus(`Backend Processing... ${percent}%`);
+        }
+      }
+    }, 2000);
+
+    return () => clearInterval(interval);
+  }, [jobId]);
 
   const handleUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     if (!e.target.files || e.target.files.length === 0) return;
@@ -44,12 +75,18 @@ export default function FraudPage() {
     });
     
     if (success) {
-      setUploadStatus("Upload successful! The backend is processing the file.");
+      setUploadStatus("Upload successful! Triggering backend processor...");
       setUploadProgress(100);
-      // Clear the input
+      
+      // Start polling the backend process!
+      setProcessingStatus("Initializing backend processor...");
+      setProcessingProgress(0);
+      setJobId(file.name); // The S3 key is "uploads/filename", so the handler uses filename as Job ID
+
       if (fileInputRef.current) fileInputRef.current.value = "";
     } else {
       setUploadStatus("Error: Upload failed or rejected by S3.");
+      setUploadProgress(0);
     }
     setUploading(false);
   };
@@ -77,7 +114,7 @@ export default function FraudPage() {
             disabled={uploading}
             className="block w-full text-sm text-zinc-400 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-xs file:font-mono file:bg-zinc-800 file:text-zinc-200 hover:file:bg-zinc-700 disabled:opacity-50 transition-colors"
           />
-          {uploading && uploadProgress > 0 && uploadProgress < 100 && (
+          {uploadProgress > 0 && (
             <div className="mt-3 w-full bg-zinc-800 rounded-full h-1.5 overflow-hidden">
               <div 
                 className="bg-emerald-500 h-full rounded-full transition-all duration-300"
@@ -89,6 +126,22 @@ export default function FraudPage() {
             <p className={`mt-2 text-xs font-mono tracking-wide ${uploadStatus.includes("Error") ? "text-red-400" : "text-emerald-400"}`}>
               {uploadStatus}
             </p>
+          )}
+
+          {/* Backend Processing Status */}
+          {jobId && (
+            <div className="mt-4 pt-4 border-t border-zinc-800">
+              <h3 className="text-[10px] font-mono text-zinc-500 tracking-widest uppercase mb-3">AI Processing Status</h3>
+              <div className="w-full bg-zinc-800 rounded-full h-1.5 overflow-hidden">
+                <div 
+                  className="bg-indigo-500 h-full rounded-full transition-all duration-500"
+                  style={{ width: `${processingProgress}%` }}
+                ></div>
+              </div>
+              <p className="mt-2 text-xs font-mono tracking-wide text-indigo-400">
+                {processingStatus}
+              </p>
+            </div>
           )}
         </div>
       </div>
