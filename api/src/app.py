@@ -27,10 +27,16 @@ def lambda_handler(event, context):
     # We add CORS headers to our response so the web browser allows the website to read the data.
     headers = {
         "Access-Control-Allow-Origin": "*",
+        "Access-Control-Allow-Methods": "GET, POST, OPTIONS, PUT",
+        "Access-Control-Allow-Headers": "Content-Type, Authorization",
         "Content-Type": "application/json"
     }
     
     try:
+        # Handle CORS Preflight requests immediately
+        if event.get("httpMethod") == "OPTIONS":
+            return build_response(200, {}, headers)
+            
         # 2. Act like a traffic cop and send them to the right helper function
         if path == "/findings":
             # They want a list of findings!
