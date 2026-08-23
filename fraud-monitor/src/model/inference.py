@@ -1,4 +1,8 @@
-import joblib
+try:
+    import joblib
+    HAS_JOBLIB = True
+except ImportError:
+    HAS_JOBLIB = False
 import os
 import numpy as np
 
@@ -12,6 +16,9 @@ _feature_names = None
 
 def load_ai():
     global _model, _feature_names
+    if not HAS_JOBLIB:
+        print("joblib not installed, gracefully degrading to rules engine.")
+        return
     if _model is None:
         try:
             _model = joblib.load(MODEL_PATH)
