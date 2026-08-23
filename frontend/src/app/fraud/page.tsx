@@ -27,8 +27,8 @@ export default function FraudPage() {
       setUploadStatus("Error: Only .csv files are allowed!");
       return;
     }
-    if (file.size > 5242880) {
-      setUploadStatus("Error: File is too large (Max 5MB)!");
+    if (file.size > 1073741824) {
+      setUploadStatus("Error: File is too large (Max 1GB)!");
       return;
     }
 

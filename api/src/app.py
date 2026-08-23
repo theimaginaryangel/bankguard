@@ -74,7 +74,7 @@ def lambda_handler(event, context):
                 Fields={"Content-Type": "text/csv"},
                 Conditions=[
                     {"Content-Type": "text/csv"},
-                    ["content-length-range", 1, 5242880] # 1 byte to 5MB max
+                    ["content-length-range", 1, 1073741824] # 1 byte to 1GB max
                 ],
                 ExpiresIn=300 # Ticket expires in 5 minutes
             )
