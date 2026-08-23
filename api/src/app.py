@@ -92,7 +92,7 @@ def lambda_handler(event, context):
                     {"Content-Type": "text/csv"},
                     ["content-length-range", 1, 1073741824] # 1 byte to 1GB max
                 ],
-                ExpiresIn=300 # Ticket expires in 5 minutes
+                ExpiresIn=3600 # Ticket expires in 1 hour
             )
             return build_response(200, presigned_post, headers)
             
