@@ -57,7 +57,7 @@ export default function ArchitecturePage() {
               Both pipelines converge on a single DynamoDB table utilizing a <span className="text-zinc-200">Single-Table Design</span>. 
             </p>
             <p>
-              This Next.js dashboard requests data through a lightweight API Gateway endpoint (the "Lambda Lith" pattern), ensuring the frontend remains thin, performant, and solely focused on presentation.
+              This Next.js dashboard requests data through a lightweight API Gateway endpoint (the &quot;Lambda Lith&quot; pattern), ensuring the frontend remains thin, performant, and solely focused on presentation.
             </p>
           </div>
         </div>
