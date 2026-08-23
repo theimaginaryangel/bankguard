@@ -10,6 +10,8 @@ export default function FraudPage() {
   const [uploadStatus, setUploadStatus] = useState("");
   const fileInputRef = useRef<HTMLInputElement>(null);
 
+  const [uploadProgress, setUploadProgress] = useState(0);
+
   useEffect(() => {
     async function load() {
       const data = await fetchFindings("FRAUD");
@@ -33,11 +35,17 @@ export default function FraudPage() {
     }
 
     setUploading(true);
+    setUploadProgress(0);
     setUploadStatus("Getting secure ticket & uploading to S3...");
     
-    const success = await uploadFileSecurely(file);
+    const success = await uploadFileSecurely(file, (percent) => {
+      setUploadProgress(percent);
+      setUploadStatus(`Uploading... ${percent}%`);
+    });
+    
     if (success) {
       setUploadStatus("Upload successful! The backend is processing the file.");
+      setUploadProgress(100);
       // Clear the input
       if (fileInputRef.current) fileInputRef.current.value = "";
     } else {
@@ -69,6 +77,14 @@ export default function FraudPage() {
             disabled={uploading}
             className="block w-full text-sm text-zinc-400 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-xs file:font-mono file:bg-zinc-800 file:text-zinc-200 hover:file:bg-zinc-700 disabled:opacity-50 transition-colors"
           />
+          {uploading && uploadProgress > 0 && uploadProgress < 100 && (
+            <div className="mt-3 w-full bg-zinc-800 rounded-full h-1.5 overflow-hidden">
+              <div 
+                className="bg-emerald-500 h-full rounded-full transition-all duration-300"
+                style={{ width: `${uploadProgress}%` }}
+              ></div>
+            </div>
+          )}
           {uploadStatus && (
             <p className={`mt-2 text-xs font-mono tracking-wide ${uploadStatus.includes("Error") ? "text-red-400" : "text-emerald-400"}`}>
               {uploadStatus}

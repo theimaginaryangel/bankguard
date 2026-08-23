@@ -23,7 +23,7 @@ export async function fetchFindings(type: 'COMPLIANCE' | 'FRAUD') {
   }
 }
 
-export async function uploadFileSecurely(file: File) {
+export async function uploadFileSecurely(file: File, onProgress?: (percent: number) => void) {
   try {
     // 1. Get the pre-signed POST "ticket" from our API
     const ticketRes = await fetch(`${API_BASE_URL}/upload-url`, {
@@ -44,15 +44,34 @@ export async function uploadFileSecurely(file: File) {
     // The file MUST be the absolute last thing in the form data!
     formData.append("file", file);
     
-    // 3. Send the file directly to S3!
-    const uploadRes = await fetch(ticket.url, {
-      method: "POST",
-      body: formData,
+    // 3. Send the file directly to S3 using XHR so we can track progress!
+    return await new Promise<boolean>((resolve, reject) => {
+      const xhr = new XMLHttpRequest();
+      
+      xhr.upload.onprogress = (event) => {
+        if (event.lengthComputable && onProgress) {
+          const percentComplete = Math.round((event.loaded / event.total) * 100);
+          onProgress(percentComplete);
+        }
+      };
+
+      xhr.onload = () => {
+        if (xhr.status >= 200 && xhr.status < 300) {
+          resolve(true);
+        } else {
+          console.error("AWS S3 rejected the file!", xhr.responseText);
+          resolve(false);
+        }
+      };
+
+      xhr.onerror = () => {
+        console.error("XHR network error during upload");
+        resolve(false);
+      };
+
+      xhr.open("POST", ticket.url, true);
+      xhr.send(formData);
     });
-    
-    if (!uploadRes.ok) throw new Error("AWS S3 rejected the file!");
-    
-    return true;
   } catch (err) {
     console.error("Upload error:", err);
     return false;
