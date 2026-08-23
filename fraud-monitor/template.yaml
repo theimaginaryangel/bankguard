@@ -21,6 +21,19 @@ Resources:
   # transactions here, and it triggers our Lambda function to read them.
   TransactionBatchesBucket:
     Type: AWS::S3::Bucket
+    Properties:
+      CorsConfiguration:
+        CorsRules:
+          - AllowedHeaders:
+              - "*"
+            AllowedMethods:
+              - POST
+              - PUT
+              - GET
+              - HEAD
+            AllowedOrigins:
+              - "*"
+            MaxAge: 3600
 
   # 3. Our Lambda Function. This is our "worker" that runs our Python code.
   FraudBatchProcessorFunction:
