@@ -65,6 +65,12 @@ def lambda_handler(event, context):
         for transaction in csv_reader:
             row_count += 1
             
+            # Normalize user's custom dataset columns to our expected schema
+            if 'transaction_dollar_amount' in transaction:
+                transaction['Amount'] = transaction['transaction_dollar_amount']
+            if 'credit_card' in transaction:
+                transaction['accountId'] = transaction['credit_card']
+                
             # Run our fast, simple rules
             triggered_rules = run_rules(transaction)
             
