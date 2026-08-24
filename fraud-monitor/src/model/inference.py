@@ -59,9 +59,10 @@ def score_transaction(transaction):
     # We convert it to a positive "risk score" between 0 and 1 to make it easy for humans.
     raw_score = _model.score_samples(X)[0]
     
-    # A simple conversion trick: raw scores usually range from -0.3 to -0.8. 
-    # We just flip it and cap it between 0 and 1.
-    risk_score = min(max(abs(raw_score) - 0.4, 0.0) * 2, 1.0)
+    # A simple conversion trick: raw scores usually range from -0.3 to -0.85.
+    # We want -0.4 to be 0.0 (normal) and -0.75+ to be 1.0 (fraud).
+    # risk_score = (abs(raw_score) - 0.4) / (0.75 - 0.4)
+    risk_score = min(max((abs(raw_score) - 0.4) / 0.35, 0.0), 1.0)
     
     # 3. Explainability (The "Why?")
     # A recruiter or auditor will ask: "Why did the AI flag this?"

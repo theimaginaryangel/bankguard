@@ -15,7 +15,7 @@ sns_client = boto3.client('sns')
 dynamodb = boto3.client('dynamodb')
 
 # How weird does it have to be for the AI to flag it? (0.0 to 1.0)
-AI_RISK_THRESHOLD = 0.7 
+AI_RISK_THRESHOLD = 0.4
 SNS_TOPIC_ARN = os.environ.get("SNS_TOPIC_ARN")
 TABLE_NAME = os.environ.get("FINDINGS_TABLE_NAME", "Findings")
 
