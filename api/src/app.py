@@ -1,6 +1,7 @@
 import boto3
 import json
 import os
+import urllib.parse
 from collections import defaultdict
 
 # We get our database table name from the environment variables

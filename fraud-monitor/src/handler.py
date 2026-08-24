@@ -70,16 +70,16 @@ def lambda_handler(event, context):
         
         # Use streaming so we don't run out of memory on 1GB Kaggle files!
         byte_stream = response['Body']
-        text_stream = codecs.iterdecode(byte_stream, 'utf-8')
         
-        # We wrap it in a generator to count bytes processed
-        def byte_counting_stream():
+        # We wrap it in a generator to count bytes processed while yielding strings
+        def line_counting_stream():
             nonlocal processed_bytes
-            for line in text_stream:
-                processed_bytes += len(line.encode('utf-8'))
-                yield line
+            for line_bytes in byte_stream.iter_lines():
+                if line_bytes:
+                    processed_bytes += len(line_bytes) + 1 # +1 for the newline
+                    yield line_bytes.decode('utf-8')
 
-        csv_reader = csv.DictReader(byte_counting_stream())
+        csv_reader = csv.DictReader(line_counting_stream())
         
         row_count = 0
         for transaction in csv_reader:
