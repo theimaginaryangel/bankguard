@@ -3,8 +3,14 @@ try:
     HAS_JOBLIB = True
 except ImportError:
     HAS_JOBLIB = False
+
+try:
+    import numpy as np
+    HAS_NUMPY = True
+except ImportError:
+    HAS_NUMPY = False
+
 import os
-import numpy as np
 
 # We load the AI's "brain" into memory as soon as this file is imported.
 # In AWS Lambda, this happens during the "cold start", saving time on future runs!
@@ -16,8 +22,8 @@ _feature_names = None
 
 def load_ai():
     global _model, _feature_names
-    if not HAS_JOBLIB:
-        print("joblib not installed, gracefully degrading to rules engine.")
+    if not HAS_JOBLIB or not HAS_NUMPY:
+        print("joblib or numpy not installed, gracefully degrading to rules engine.")
         return
     if _model is None:
         try:
