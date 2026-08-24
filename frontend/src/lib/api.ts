@@ -3,7 +3,7 @@ export const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || "https://rl46a80a
 
 export async function fetchSummary() {
   try {
-    const res = await fetch(`${API_BASE_URL}/stats/summary`);
+    const res = await fetch(`${API_BASE_URL}/stats/summary?t=${Date.now()}`);
     if (!res.ok) return null;
     return await res.json();
   } catch (err) {
@@ -14,7 +14,8 @@ export async function fetchSummary() {
 
 export async function fetchFindings(type: 'COMPLIANCE' | 'FRAUD') {
   try {
-    const res = await fetch(`${API_BASE_URL}/findings?type=${type}`);
+    // We add a timestamp to the URL to bypass any aggressive browser caching or cached CORS failures!
+    const res = await fetch(`${API_BASE_URL}/findings?type=${type}&t=${Date.now()}`);
     if (!res.ok) return [];
     return await res.json();
   } catch (err) {
@@ -80,7 +81,7 @@ export async function uploadFileSecurely(file: File, onProgress?: (percent: numb
 
 export async function checkJobStatus(jobId: string) {
   try {
-    const res = await fetch(`${API_BASE_URL}/job-status/${encodeURIComponent(jobId)}`);
+    const res = await fetch(`${API_BASE_URL}/job-status/${encodeURIComponent(jobId)}?t=${Date.now()}`);
     if (!res.ok) return null;
     return await res.json();
   } catch (err) {
