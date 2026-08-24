@@ -106,7 +106,6 @@ def lambda_handler(event, context):
                 Key=f"uploads/{filename}",
                 Fields={},
                 Conditions=[
-                    ["starts-with", "$Content-Type", ""],
                     ["content-length-range", 1, 1073741824] # 1 byte to 1GB max
                 ],
                 ExpiresIn=3600 # Ticket expires in 1 hour
