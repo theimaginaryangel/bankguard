@@ -43,13 +43,19 @@ graph TD
 3. **Shared API (`/api`)**: A lightweight, read-only "Lambda Lith" API Gateway that securely fetches paginated data and summary stats from DynamoDB.
 4. **Web Dashboard (`/frontend`)**: A React/Next.js interface allowing non-technical stakeholders to view the live health of the cloud infrastructure and recent fraudulent activity in one unified pane of glass.
 
-## 🧠 Engineering Decisions
+## 🧠 Engineering Decisions & Challenges
 
 Why build it this way? See the [**Decisions Log**](docs/decisions.md) for a deep dive into the engineering tradeoffs made during this project, including:
 - Why we used a Single-Table DynamoDB design for two vastly different data shapes.
 - Why we chose an Isolation Forest over deep learning.
 - Why we used AWS SAM.
 - Why the API uses a "Lambda Lith" pattern.
+
+What went wrong while building it? See the [**Challenges Log**](docs/challenges.md) for a candid look at the technical hurdles we faced, including:
+- Fighting the 250MB AWS Lambda limit with Machine Learning libraries.
+- Debugging S3 Presigned POST quirks across operating systems.
+- Calibrating Scikit-Learn IsolationForest anomaly thresholds.
+- Recovering from silent failures and artifact desynchronization.
 
 ## 🛠️ How to run it
 
