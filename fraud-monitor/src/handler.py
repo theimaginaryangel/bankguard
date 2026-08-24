@@ -35,7 +35,26 @@ def update_job_progress(job_id, processed_bytes, total_bytes):
     except Exception as e:
         print(f"Failed to update progress: {e}")
 
+def clear_old_fraud_findings():
+    try:
+        response = dynamodb.query(
+            TableName=TABLE_NAME,
+            KeyConditionExpression="findingType = :ft",
+            ExpressionAttributeValues={":ft": {"S": "FRAUD"}}
+        )
+        for item in response.get('Items', []):
+            dynamodb.delete_item(
+                TableName=TABLE_NAME,
+                Key={'findingType': {'S': 'FRAUD'}, 'findingId': item['findingId']}
+            )
+        print("Cleared old fraud findings.")
+    except Exception as e:
+        print(f"Error clearing findings: {e}")
+
 def lambda_handler(event, context):
+    # Wipe old fraud findings on every new batch upload to keep the dashboard clean!
+    clear_old_fraud_findings()
+    
     for record in event['Records']:
         bucket_name = record['s3']['bucket']['name']
         file_key = urllib.parse.unquote_plus(record['s3']['object']['key'])

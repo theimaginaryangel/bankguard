@@ -36,15 +36,18 @@ def write_compliance_finding(
     remediation: str,
 ) -> dict:
     """
-    Writes one COMPLIANCE finding. Only call this when a check FAILS —
-    passing checks don't get a row, to keep the table free of noise.
+    Writes one COMPLIANCE finding. Only call this when a check FAILS.
+    We use a deterministic ID based on check_id and resource_id so that 
+    future runs of the same check overwrite the finding instead of duplicating it!
     """
     table_name = os.environ["FINDINGS_TABLE_NAME"]
     table = _dynamodb.Table(table_name)
 
+    finding_id = f"{check_id}-{resource_id}"
+
     item = {
         "findingType": "COMPLIANCE",
-        "findingId": _new_finding_id(),
+        "findingId": finding_id,
         "severity": severity,
         "title": title,
         "description": description,

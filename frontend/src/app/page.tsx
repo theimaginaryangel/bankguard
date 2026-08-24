@@ -10,6 +10,7 @@ export default function OverviewPage() {
 
   useEffect(() => {
     async function loadStats() {
+      setLoading(true);
       const data = await fetchSummary();
       setStats(data);
       setLoading(false);
@@ -18,7 +19,14 @@ export default function OverviewPage() {
   }, []);
 
   if (loading) {
-    return <div className="text-sm font-mono tracking-widest text-zinc-500 uppercase animate-pulse">Loading System Data...</div>;
+    return (
+      <div className="flex h-[50vh] items-center justify-center text-zinc-500">
+        <div className="flex flex-col items-center gap-4">
+          <div className="h-8 w-8 animate-spin rounded-full border-4 border-zinc-800 border-t-red-600"></div>
+          <p className="text-sm font-mono tracking-widest uppercase">Loading System Data...</p>
+        </div>
+      </div>
+    );
   }
 
   return (
