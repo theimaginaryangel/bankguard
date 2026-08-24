@@ -62,7 +62,7 @@ def lambda_handler(event, context):
                 else:
                     return build_response(404, {"error": "Finding not found"}, headers)
                     
-        elif path == "/stats/summary":
+        elif path == "/overview-data":
             # They want the dashboard numbers (e.g., "5 Critical Frauds")
             data = get_stats_summary()
             return build_response(200, data, headers)

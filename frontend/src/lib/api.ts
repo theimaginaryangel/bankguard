@@ -3,7 +3,7 @@ export const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || "https://rl46a80a
 
 export async function fetchSummary() {
   try {
-    const res = await fetch(`${API_BASE_URL}/stats/summary?t=${Date.now()}`);
+    const res = await fetch(`${API_BASE_URL}/overview-data?t=${Date.now()}`);
     if (!res.ok) return null;
     return await res.json();
   } catch (err) {
