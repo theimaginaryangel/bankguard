@@ -1,4 +1,4 @@
-﻿import boto3
+import boto3
 import json
 import os
 import urllib.parse
@@ -104,9 +104,9 @@ def lambda_handler(event, context):
             presigned_post = _s3.generate_presigned_post(
                 Bucket=UPLOAD_BUCKET,
                 Key=f"uploads/{filename}",
-                Fields={"Content-Type": "text/csv"},
+                Fields={},
                 Conditions=[
-                    {"Content-Type": "text/csv"},
+                    ["starts-with", "$Content-Type", ""],
                     ["content-length-range", 1, 1073741824] # 1 byte to 1GB max
                 ],
                 ExpiresIn=3600 # Ticket expires in 1 hour
