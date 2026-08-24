@@ -80,7 +80,7 @@ export async function uploadFileSecurely(file: File, onProgress?: (percent: numb
 
 export async function checkJobStatus(jobId: string) {
   try {
-    const res = await fetch(`${API_BASE_URL}/job-status/${jobId}`);
+    const res = await fetch(`${API_BASE_URL}/job-status/${encodeURIComponent(jobId)}`);
     if (!res.ok) return null;
     return await res.json();
   } catch (err) {

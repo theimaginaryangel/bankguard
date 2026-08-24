@@ -5,6 +5,7 @@ import os
 import io
 import codecs
 import time
+import urllib.parse
 from common.findings import write_fraud_finding
 from rules.engine import run_rules
 from model.inference import score_transaction
@@ -35,9 +36,9 @@ def update_job_progress(job_id, processed_bytes, total_bytes):
         print(f"Failed to update progress: {e}")
 
 def lambda_handler(event, context):
-    for record in event.get('Records', []):
+    for record in event['Records']:
         bucket_name = record['s3']['bucket']['name']
-        file_key = record['s3']['object']['key']
+        file_key = urllib.parse.unquote_plus(record['s3']['object']['key'])
         job_id = file_key.split('/')[-1] # The filename is the job ID
         
         print(f"Reading new file {file_key} from bucket {bucket_name}...")
