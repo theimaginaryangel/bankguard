@@ -1,7 +1,7 @@
-# Python
+﻿# Python
 __pycache__/
 *.py[cod]
-*$py.class
+*.class
 *.so
 .Python
 env/
@@ -36,3 +36,16 @@ build/
 # OS
 .DS_Store
 Thumbs.db
+
+# Exclude downloaded python packages in src
+fraud-monitor/src/*
+!fraud-monitor/src/*.py
+!fraud-monitor/src/model/
+fraud-monitor/src/model/*
+!fraud-monitor/src/model/*.py
+!fraud-monitor/src/model/*.joblib
+!fraud-monitor/src/rules/
+!fraud-monitor/src/rules/*.py
+!fraud-monitor/src/common/
+!fraud-monitor/src/common/*.py
+!fraud-monitor/src/requirements.txt

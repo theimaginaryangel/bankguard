@@ -55,6 +55,20 @@ def lambda_handler(event, context):
     # Wipe old fraud findings on every new batch upload to keep the dashboard clean!
     clear_old_fraud_findings()
     
+    # DEBUG: Try importing sklearn right now
+    try:
+        import sklearn
+        print("SKLEARN IMPORTED SUCCESSFULLY!")
+        from sklearn.ensemble import IsolationForest
+    except Exception as e:
+        print(f"CRITICAL SKLEARN IMPORT ERROR: {e}")
+        
+    try:
+        import numpy
+        print("NUMPY IMPORTED SUCCESSFULLY!")
+    except Exception as e:
+        print(f"CRITICAL NUMPY IMPORT ERROR: {e}")
+        
     for record in event['Records']:
         bucket_name = record['s3']['bucket']['name']
         file_key = urllib.parse.unquote_plus(record['s3']['object']['key'])
