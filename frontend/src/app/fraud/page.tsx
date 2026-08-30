@@ -6,6 +6,7 @@ import { fetchFindings, uploadFileSecurely, checkJobStatus } from "@/lib/api";
 export default function FraudPage() {
   const [findings, setFindings] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
+  const [fetchError, setFetchError] = useState<string | null>(null);
   const [uploading, setUploading] = useState(false);
   const [uploadStatus, setUploadStatus] = useState("");
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -15,36 +16,72 @@ export default function FraudPage() {
   const [processingStatus, setProcessingStatus] = useState("");
   const [jobId, setJobId] = useState("");
 
-  useEffect(() => {
-    async function load() {
+  const loadData = async (isMounted = true) => {
+    try {
       const data = await fetchFindings("FRAUD");
-      setFindings(data);
-      setLoading(false);
+      if (isMounted) {
+        setFindings(data);
+        setFetchError(null);
+      }
+    } catch (err) {
+      if (isMounted) {
+        setFetchError("Failed to fetch fraud findings from the backend.");
+      }
+    } finally {
+      if (isMounted) {
+        setLoading(false);
+      }
     }
-    load();
+  };
+
+  useEffect(() => {
+    let isMounted = true;
+    loadData(isMounted);
+    return () => {
+      isMounted = false;
+    };
   }, []);
 
   useEffect(() => {
     if (!jobId) return;
 
+    let attempts = 0;
+    const maxAttempts = 90; // 3 minutes timeout (90 * 2000ms)
+    let nullCount = 0;
+
     const interval = setInterval(async () => {
+      attempts++;
+      if (attempts > maxAttempts) {
+        clearInterval(interval);
+        setProcessingStatus("Processing timed out. Please check AWS CloudWatch logs.");
+        setJobId("");
+        return;
+      }
+
       const status = await checkJobStatus(jobId);
       if (status) {
+        nullCount = 0;
         const processed = Number(status.processedBytes || 0);
         const total = Number(status.totalBytes || 1);
-        const percent = Math.round((processed / total) * 100);
+        const percent = Math.min(100, Math.round((processed / total) * 100));
         setProcessingProgress(percent);
         
         if (status.status === "COMPLETED" || percent >= 100) {
           setProcessingStatus(`Backend Processing Complete! (100%)`);
           clearInterval(interval);
           setJobId("");
-          
-          // Reload the table so the user sees the new findings!
-          const data = await fetchFindings("FRAUD");
-          setFindings(data);
+          loadData();
+        } else if (status.status === "FAILED") {
+          setProcessingStatus("Backend processing failed. Check Lambda logs.");
+          clearInterval(interval);
+          setJobId("");
         } else {
           setProcessingStatus(`Backend Processing... ${percent}%`);
+        }
+      } else {
+        nullCount++;
+        if (nullCount > 15) { // 30 seconds with no progress record
+          setProcessingStatus("Waiting for job initialization...");
         }
       }
     }, 2000);
@@ -56,12 +93,19 @@ export default function FraudPage() {
     if (!e.target.files || e.target.files.length === 0) return;
     
     const file = e.target.files[0];
-    if (!file.name.endsWith('.csv')) {
+    if (!file.name.toLowerCase().endsWith('.csv')) {
       setUploadStatus("Error: Only .csv files are allowed!");
+      if (fileInputRef.current) fileInputRef.current.value = "";
+      return;
+    }
+    if (file.size === 0) {
+      setUploadStatus("Error: File is empty (0 bytes)!");
+      if (fileInputRef.current) fileInputRef.current.value = "";
       return;
     }
     if (file.size > 1073741824) {
       setUploadStatus("Error: File is too large (Max 1GB)!");
+      if (fileInputRef.current) fileInputRef.current.value = "";
       return;
     }
 
@@ -79,14 +123,15 @@ export default function FraudPage() {
       setUploadProgress(100);
       
       // Start polling the backend process!
-      setProcessingStatus("Initializing backend processor...");
+      setProcessingStatus("Initializing backend processor & AI model...");
       setProcessingProgress(0);
-      setJobId(file.name); // The S3 key is "uploads/filename", so the handler uses filename as Job ID
+      setJobId(file.name);
 
       if (fileInputRef.current) fileInputRef.current.value = "";
     } else {
       setUploadStatus("Error: Upload failed or rejected by S3.");
       setUploadProgress(0);
+      if (fileInputRef.current) fileInputRef.current.value = "";
     }
     setUploading(false);
   };
@@ -99,7 +144,7 @@ export default function FraudPage() {
         <div className="space-y-4">
           <h1 className="text-3xl font-light tracking-wide text-white">Fraud Monitor</h1>
           <p className="text-lg font-light text-zinc-400 max-w-2xl leading-relaxed">
-            Transactional anomaly detection powered by Isolation Forest.
+            Transactional anomaly detection powered by dynamic Isolation Forest machine learning.
           </p>
         </div>
         
@@ -155,6 +200,12 @@ export default function FraudPage() {
         </div>
       </div>
 
+      {fetchError && (
+        <div className="p-4 bg-red-500/10 border border-red-500/20 rounded-xl text-red-400 text-sm font-mono">
+          {fetchError}
+        </div>
+      )}
+
       <div className="rounded-2xl border border-zinc-800 bg-[#0a0a0a] overflow-x-auto shadow-2xl">
         <table className="w-full text-left border-collapse">
           <thead>
@@ -170,72 +221,81 @@ export default function FraudPage() {
             {findings.length === 0 ? (
               <tr>
                 <td colSpan={5} className="p-10 text-center text-zinc-500 font-light">
-                  No anomalous activity detected.
+                  {fetchError ? "Unable to load findings." : "No anomalous activity detected."}
                 </td>
               </tr>
             ) : (
-              findings.map((f, i) => (
-                <tr key={f.findingId || i} className="border-b border-zinc-800 hover:bg-zinc-900/30 transition-colors">
-                  <td className="p-6">
-                    <span className={`inline-flex items-center justify-center px-3 py-1 rounded-full font-mono text-[10px] tracking-widest uppercase ${
-                      f.severity === 'CRITICAL' ? 'bg-red-500/10 text-red-400 border border-red-500/20' :
-                      f.severity === 'HIGH' ? 'bg-orange-500/10 text-orange-400 border border-orange-500/20' :
-                      'bg-yellow-500/10 text-yellow-400 border border-yellow-500/20'
-                    }`}>
-                      {f.severity}
-                    </span>
-                  </td>
-                  <td className="p-6">
-                    <div className="font-mono text-sm text-zinc-300 truncate max-w-[150px]" title={f.fraudDetails?.transactionId}>
-                      {f.fraudDetails?.transactionId}
-                    </div>
-                    <div className="text-[10px] font-mono text-zinc-600 mt-2 uppercase tracking-wide">{new Date(f.createdAt).toLocaleString()}</div>
-                  </td>
-                  <td className="p-6 font-light text-zinc-200">
-                    ${f.fraudDetails?.amount}
-                  </td>
-                  <td className="p-6">
-                    <div className="flex items-center">
-                      <div className="w-16 bg-zinc-800 rounded-full h-1.5 mr-3 overflow-hidden">
-                        <div 
-                          className={`h-full rounded-full ${
-                            Number(f.fraudDetails?.riskScore) > 0.8 ? 'bg-red-500' : 
-                            Number(f.fraudDetails?.riskScore) > 0.5 ? 'bg-orange-500' : 'bg-emerald-500'
-                          }`}
-                          style={{ width: `${Math.min(100, Number(f.fraudDetails?.riskScore) * 100)}%` }}
-                        ></div>
+              findings.map((f, i) => {
+                const rawScore = Number(f.fraudDetails?.riskScore);
+                const score = isNaN(rawScore) ? 0 : rawScore;
+                const dateStr = f.createdAt ? new Date(f.createdAt).toLocaleString() : "Unknown Date";
+
+                return (
+                  <tr key={f.findingId || `fraud-${i}`} className="border-b border-zinc-800 hover:bg-zinc-900/30 transition-colors">
+                    <td className="p-6">
+                      <span className={`inline-flex items-center justify-center px-3 py-1 rounded-full font-mono text-[10px] tracking-widest uppercase ${
+                        f.severity === 'CRITICAL' ? 'bg-red-500/10 text-red-400 border border-red-500/20' :
+                        f.severity === 'HIGH' ? 'bg-orange-500/10 text-orange-400 border border-orange-500/20' :
+                        'bg-yellow-500/10 text-yellow-400 border border-yellow-500/20'
+                      }`}>
+                        {f.severity || "MEDIUM"}
+                      </span>
+                    </td>
+                    <td className="p-6">
+                      <div className="font-mono text-sm text-zinc-300 truncate max-w-[150px]" title={f.fraudDetails?.transactionId}>
+                        {f.fraudDetails?.transactionId || "N/A"}
                       </div>
-                      <span className="font-mono text-xs text-zinc-400">{Number(f.fraudDetails?.riskScore).toFixed(2)}</span>
-                    </div>
-                  </td>
-                  <td className="p-6 max-w-sm">
-                    {/* Triggered Rules */}
-                    {f.fraudDetails?.triggeredRules && f.fraudDetails.triggeredRules.length > 0 && (
-                      <div className="flex flex-wrap gap-2 mb-4">
-                        {f.fraudDetails.triggeredRules.map((rule: string) => (
-                          <span key={rule} className="px-2 py-1 bg-zinc-800 text-zinc-300 rounded-sm font-mono text-[10px] uppercase tracking-wider">
-                            {rule}
-                          </span>
-                        ))}
+                      <div className="text-[10px] font-mono text-zinc-600 mt-2 uppercase tracking-wide">{dateStr}</div>
+                    </td>
+                    <td className="p-6 font-light text-zinc-200">
+                      ${f.fraudDetails?.amount !== undefined ? Number(f.fraudDetails.amount).toFixed(2) : "0.00"}
+                    </td>
+                    <td className="p-6">
+                      <div className="flex items-center">
+                        <div className="w-16 bg-zinc-800 rounded-full h-1.5 mr-3 overflow-hidden">
+                          <div 
+                            className={`h-full rounded-full ${
+                              score > 0.8 ? 'bg-red-500' : 
+                              score > 0.5 ? 'bg-orange-500' : 'bg-emerald-500'
+                            }`}
+                            style={{ width: `${Math.min(100, Math.max(0, score * 100))}%` }}
+                          ></div>
+                        </div>
+                        <span className="font-mono text-xs text-zinc-400">{score.toFixed(2)}</span>
                       </div>
-                    )}
-                    {/* Contributing Features from AI */}
-                    {f.fraudDetails?.contributingFeatures && Object.keys(f.fraudDetails.contributingFeatures).length > 0 && (
-                      <div className="text-xs text-zinc-500 font-light">
-                        <span className="font-mono text-[10px] tracking-widest uppercase text-zinc-600 block mb-2">PCA Deviations</span>
-                        <ul className="space-y-1.5">
-                          {Object.entries(f.fraudDetails.contributingFeatures).map(([feature, val]) => (
-                            <li key={feature} className="flex justify-between border-b border-zinc-800/50 pb-1.5">
-                              <span className="font-mono text-zinc-400">{feature}</span>
-                              <span className="text-zinc-500">{Number(val).toFixed(2)}</span>
-                            </li>
+                    </td>
+                    <td className="p-6 max-w-sm">
+                      {/* Triggered Rules */}
+                      {f.fraudDetails?.triggeredRules && f.fraudDetails.triggeredRules.length > 0 && (
+                        <div className="flex flex-wrap gap-2 mb-4">
+                          {f.fraudDetails.triggeredRules.map((rule: string, idx: number) => (
+                            <span key={`${rule}-${idx}`} className="px-2 py-1 bg-zinc-800 text-zinc-300 rounded-sm font-mono text-[10px] uppercase tracking-wider">
+                              {rule}
+                            </span>
                           ))}
-                        </ul>
-                      </div>
-                    )}
-                  </td>
-                </tr>
-              ))
+                        </div>
+                      )}
+                      {/* Contributing Features from AI */}
+                      {f.fraudDetails?.contributingFeatures && Object.keys(f.fraudDetails.contributingFeatures).length > 0 && (
+                        <div className="text-xs text-zinc-500 font-light">
+                          <span className="font-mono text-[10px] tracking-widest uppercase text-zinc-600 block mb-2">PCA Deviations</span>
+                          <ul className="space-y-1.5">
+                            {Object.entries(f.fraudDetails.contributingFeatures).map(([feature, val]) => {
+                              const numVal = Number(val);
+                              return (
+                                <li key={feature} className="flex justify-between border-b border-zinc-800/50 pb-1.5">
+                                  <span className="font-mono text-zinc-400">{feature}</span>
+                                  <span className="text-zinc-500">{isNaN(numVal) ? String(val) : numVal.toFixed(2)}</span>
+                                </li>
+                              );
+                            })}
+                          </ul>
+                        </div>
+                      )}
+                    </td>
+                  </tr>
+                );
+              })
             )}
           </tbody>
         </table>

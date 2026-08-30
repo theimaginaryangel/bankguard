@@ -16,11 +16,11 @@ export async function fetchFindings(type: 'COMPLIANCE' | 'FRAUD') {
   try {
     // We add a timestamp to the URL to bypass any aggressive browser caching or cached CORS failures!
     const res = await fetch(`${API_BASE_URL}/findings?type=${type}&t=${Date.now()}`);
-    if (!res.ok) return [];
+    if (!res.ok) throw new Error(`HTTP Error ${res.status}`);
     return await res.json();
   } catch (err) {
     console.error(`Error fetching ${type} findings:`, err);
-    return [];
+    throw err;
   }
 }
 
@@ -36,6 +36,9 @@ export async function uploadFileSecurely(file: File, onProgress?: (percent: numb
     if (!ticketRes.ok) throw new Error("Failed to get upload ticket");
     
     const ticket = await ticketRes.json();
+    if (!ticket || !ticket.url || !ticket.fields) {
+      throw new Error("Invalid presigned ticket returned by API");
+    }
     
     // 2. Build the exact form data S3 expects
     const formData = new FormData();
@@ -46,8 +49,9 @@ export async function uploadFileSecurely(file: File, onProgress?: (percent: numb
     formData.append("file", file);
     
     // 3. Send the file directly to S3 using XHR so we can track progress!
-    return await new Promise<boolean>((resolve, reject) => {
+    return await new Promise<boolean>((resolve) => {
       const xhr = new XMLHttpRequest();
+      xhr.timeout = 180000; // 3 minute timeout for large files
       
       xhr.upload.onprogress = (event) => {
         if (event.lengthComputable && onProgress) {
@@ -67,6 +71,16 @@ export async function uploadFileSecurely(file: File, onProgress?: (percent: numb
 
       xhr.onerror = () => {
         console.error("XHR network error during upload");
+        resolve(false);
+      };
+
+      xhr.ontimeout = () => {
+        console.error("XHR upload timed out");
+        resolve(false);
+      };
+
+      xhr.onabort = () => {
+        console.error("XHR upload aborted");
         resolve(false);
       };
 

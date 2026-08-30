@@ -7,15 +7,36 @@ import Link from "next/link";
 export default function OverviewPage() {
   const [stats, setStats] = useState<any>(null);
   const [loading, setLoading] = useState(true);
+  const [fetchError, setFetchError] = useState<string | null>(null);
 
   useEffect(() => {
+    let isMounted = true;
     async function loadStats() {
       setLoading(true);
-      const data = await fetchSummary();
-      setStats(data);
-      setLoading(false);
+      try {
+        const data = await fetchSummary();
+        if (isMounted) {
+          if (data) {
+            setStats(data);
+            setFetchError(null);
+          } else {
+            setFetchError("Unable to load summary statistics from API.");
+          }
+        }
+      } catch (err) {
+        if (isMounted) {
+          setFetchError("Connection error while loading telemetry data.");
+        }
+      } finally {
+        if (isMounted) {
+          setLoading(false);
+        }
+      }
     }
     loadStats();
+    return () => {
+      isMounted = false;
+    };
   }, []);
 
   if (loading) {
@@ -39,31 +60,51 @@ export default function OverviewPage() {
         </p>
       </div>
 
+      {fetchError && (
+        <div className="p-4 bg-red-500/10 border border-red-500/20 rounded-xl text-red-400 text-sm font-mono flex items-center justify-between">
+          <span>{fetchError}</span>
+          <button 
+            onClick={() => window.location.reload()}
+            className="px-3 py-1 bg-red-500/20 hover:bg-red-500/30 text-red-300 rounded text-xs transition-colors uppercase tracking-wider"
+          >
+            Retry
+          </button>
+        </div>
+      )}
+
       {/* Summary Cards */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
         
         {/* Card 1 - Critical Fraud (Red = Danger) */}
         <div className="relative flex flex-col h-full p-6 overflow-hidden rounded-2xl bg-[#0a0a0a] border border-zinc-800 transition-all duration-500 hover:border-red-500/50 hover:shadow-[0_0_15px_rgba(239,68,68,0.1)] hover:-translate-y-1">
           <h3 className="font-mono text-[10px] tracking-widest text-zinc-500 uppercase">Critical Frauds</h3>
-          <p className="text-4xl font-light text-red-500 mt-4">{stats?.FRAUD?.CRITICAL || 0}</p>
+          <p className="text-4xl font-light text-red-500 mt-4">
+            {stats ? (stats?.FRAUD?.CRITICAL || 0) : "-"}
+          </p>
         </div>
 
         {/* Card 2 - Critical Compliance (Red = Danger) */}
         <div className="relative flex flex-col h-full p-6 overflow-hidden rounded-2xl bg-[#0a0a0a] border border-zinc-800 transition-all duration-500 hover:border-red-500/50 hover:shadow-[0_0_15px_rgba(239,68,68,0.1)] hover:-translate-y-1">
           <h3 className="font-mono text-[10px] tracking-widest text-zinc-500 uppercase">Critical Misconfigs</h3>
-          <p className="text-4xl font-light text-red-500 mt-4">{stats?.COMPLIANCE?.CRITICAL || 0}</p>
+          <p className="text-4xl font-light text-red-500 mt-4">
+            {stats ? (stats?.COMPLIANCE?.CRITICAL || 0) : "-"}
+          </p>
         </div>
 
         {/* Card 3 - High Risk Fraud (Orange = Warning) */}
         <div className="relative flex flex-col h-full p-6 overflow-hidden rounded-2xl bg-[#0a0a0a] border border-zinc-800 transition-all duration-500 hover:border-orange-500/50 hover:shadow-[0_0_15px_rgba(249,115,22,0.1)] hover:-translate-y-1">
           <h3 className="font-mono text-[10px] tracking-widest text-zinc-500 uppercase">High Risk Frauds</h3>
-          <p className="text-4xl font-light text-orange-400 mt-4">{stats?.FRAUD?.HIGH || 0}</p>
+          <p className="text-4xl font-light text-orange-400 mt-4">
+            {stats ? (stats?.FRAUD?.HIGH || 0) : "-"}
+          </p>
         </div>
 
         {/* Card 4 - High Risk Compliance (Orange = Warning) */}
         <div className="relative flex flex-col h-full p-6 overflow-hidden rounded-2xl bg-[#0a0a0a] border border-zinc-800 transition-all duration-500 hover:border-orange-500/50 hover:shadow-[0_0_15px_rgba(249,115,22,0.1)] hover:-translate-y-1">
           <h3 className="font-mono text-[10px] tracking-widest text-zinc-500 uppercase">High Risk Misconfigs</h3>
-          <p className="text-4xl font-light text-orange-400 mt-4">{stats?.COMPLIANCE?.HIGH || 0}</p>
+          <p className="text-4xl font-light text-orange-400 mt-4">
+            {stats ? (stats?.COMPLIANCE?.HIGH || 0) : "-"}
+          </p>
         </div>
 
       </div>

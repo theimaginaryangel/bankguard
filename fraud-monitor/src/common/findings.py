@@ -1,6 +1,7 @@
 import boto3
 import os
 import uuid
+import time
 from datetime import datetime, timezone
 
 # We get our table name from our environment variables (set in template.yaml)
@@ -14,37 +15,40 @@ def write_fraud_finding(title, description, severity, transaction_id, risk_score
     This function takes all the details about a suspicious transaction 
     and saves them as a "finding" into our DynamoDB database.
     """
-    
-    # We use a unique ID for each finding so they don't overwrite each other.
-    # In a real system we'd use a ULID (which sorts by time), but a UUID works fine here!
-    finding_id = str(uuid.uuid4())
+    # Timestamp-prefixed findingId ensures chronological sorting when queried with ScanIndexForward=False
+    ts_ms = int(time.time() * 1000)
+    finding_id = f"{ts_ms}-{uuid.uuid4().hex[:8]}"
     
     # We grab the current time so we know exactly when we found this
     created_at = datetime.now(timezone.utc).isoformat()
     
+    safe_tx_id = str(transaction_id or "unknown_tx")
+    safe_amount = str(amount if amount is not None and str(amount).strip() != "" else 0.0)
+    safe_risk_score = str(risk_score if risk_score is not None and str(risk_score).strip() != "" else 0.0)
+    safe_merchant = str(merchant_category or "unknown")
+
     # Here we are preparing the 'Item' exactly how DynamoDB likes it.
-    # DynamoDB expects us to tell it the data type of each value (like 'S' for String, 'N' for Number)
     item = {
         # --- Shared Envelope Fields ---
         "findingType": {"S": "FRAUD"},          # This tells the frontend it's a Fraud finding
         "findingId": {"S": finding_id},
-        "severity": {"S": severity},            # "CRITICAL", "HIGH", "MEDIUM", or "LOW"
-        "title": {"S": title},
-        "description": {"S": description},
+        "severity": {"S": severity or "MEDIUM"},# "CRITICAL", "HIGH", "MEDIUM", or "LOW"
+        "title": {"S": title or f"Suspicious Transaction: {safe_tx_id}"},
+        "description": {"S": description or "Transaction flagged by Fraud Monitor rules/AI."},
         "createdAt": {"S": created_at},
         "status": {"S": "OPEN"},                # All new findings start as "OPEN"
         "remediation": {"S": "Review transaction and contact customer to confirm activity."},
         
         # --- Fraud Specific Fields ---
         "fraudDetails": {"M": {                 # 'M' stands for Map (a dictionary)
-            "transactionId": {"S": transaction_id},
-            "riskScore": {"N": str(risk_score)}, # Isolation Forest score
-            "amount": {"N": str(amount)},
-            "merchantCategory": {"S": merchant_category},
-            "triggeredRules": {"L": [{"S": rule} for rule in triggered_rules]}, # 'L' stands for List
+            "transactionId": {"S": safe_tx_id},
+            "riskScore": {"N": safe_risk_score}, # Isolation Forest score
+            "amount": {"N": safe_amount},
+            "merchantCategory": {"S": safe_merchant},
+            "triggeredRules": {"L": [{"S": str(rule)} for rule in (triggered_rules or [])]}, # 'L' stands for List
             "contributingFeatures": {"M": {
                 # Convert our features into a DynamoDB map format.
-                key: {"N": str(value)} for key, value in contributing_features.items()
+                str(k): {"N": str(v)} for k, v in (contributing_features or {}).items()
             }}
         }}
     }
