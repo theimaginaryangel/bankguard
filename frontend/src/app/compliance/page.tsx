@@ -11,14 +11,13 @@ export default function CompliancePage() {
   useEffect(() => {
     let isMounted = true;
     async function load() {
-      setLoading(true);
       try {
         const data = await fetchFindings("COMPLIANCE");
         if (isMounted) {
           setFindings(data);
           setFetchError(null);
         }
-      } catch (err) {
+      } catch {
         if (isMounted) {
           setFetchError("Failed to fetch compliance findings from the backend.");
         }

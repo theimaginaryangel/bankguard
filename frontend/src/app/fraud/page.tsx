@@ -16,27 +16,36 @@ export default function FraudPage() {
   const [processingStatus, setProcessingStatus] = useState("");
   const [jobId, setJobId] = useState("");
 
-  const loadData = async (isMounted = true) => {
+  const refreshFindings = async () => {
     try {
       const data = await fetchFindings("FRAUD");
-      if (isMounted) {
-        setFindings(data);
-        setFetchError(null);
-      }
-    } catch (err) {
-      if (isMounted) {
-        setFetchError("Failed to fetch fraud findings from the backend.");
-      }
-    } finally {
-      if (isMounted) {
-        setLoading(false);
-      }
+      setFindings(data);
+      setFetchError(null);
+    } catch {
+      setFetchError("Failed to fetch fraud findings from the backend.");
     }
   };
 
   useEffect(() => {
     let isMounted = true;
-    loadData(isMounted);
+    async function load() {
+      try {
+        const data = await fetchFindings("FRAUD");
+        if (isMounted) {
+          setFindings(data);
+          setFetchError(null);
+        }
+      } catch {
+        if (isMounted) {
+          setFetchError("Failed to fetch fraud findings from the backend.");
+        }
+      } finally {
+        if (isMounted) {
+          setLoading(false);
+        }
+      }
+    }
+    load();
     return () => {
       isMounted = false;
     };
@@ -70,7 +79,7 @@ export default function FraudPage() {
           setProcessingStatus(`Backend Processing Complete! (100%)`);
           clearInterval(interval);
           setJobId("");
-          loadData();
+          refreshFindings();
         } else if (status.status === "FAILED") {
           setProcessingStatus("Backend processing failed. Check Lambda logs.");
           clearInterval(interval);

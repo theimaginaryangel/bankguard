@@ -12,7 +12,6 @@ export default function OverviewPage() {
   useEffect(() => {
     let isMounted = true;
     async function loadStats() {
-      setLoading(true);
       try {
         const data = await fetchSummary();
         if (isMounted) {
@@ -23,7 +22,7 @@ export default function OverviewPage() {
             setFetchError("Unable to load summary statistics from API.");
           }
         }
-      } catch (err) {
+      } catch {
         if (isMounted) {
           setFetchError("Connection error while loading telemetry data.");
         }
