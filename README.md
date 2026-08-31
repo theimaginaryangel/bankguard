@@ -2,9 +2,9 @@
 
 **A cloud-native data pipeline demonstrating applied AWS security, machine learning, and full-stack integration.**
 
-This project consists of two independent backend pipelines (a Cloud Compliance Auditor and a Transaction Fraud Monitor) that report into a single, unified database. The results are surfaced through a modern Next.js web dashboard designed for instant legibility.
+BankGuard unifies two critical banking defense pipelines—a **Cloud Compliance Auditor** evaluating infrastructure against strict CIS benchmarks and a **Transaction Fraud Monitor** executing machine learning anomaly detection on financial records—reporting into a single DynamoDB data layer and surfaced through a high-fidelity Next.js web dashboard.
 
-Every number shown on the frontend comes from a Lambda that actually ran against real AWS configuration APIs or a real (batch-processed) Kaggle fraud dataset.
+Every metric and alert shown on the dashboard reflects real AWS API audits and batch transactions processed through applied machine learning.
 
 ---
 
@@ -13,54 +13,71 @@ Every number shown on the frontend comes from a Lambda that actually ran against
 ```mermaid
 graph TD
     subgraph "Backend Pipelines (AWS SAM)"
-        A[Compliance Auditor<br>Scheduled EventBridge Lambda]
-        B[Fraud Monitor<br>S3 Triggered Lambda + Isolation Forest AI]
+        A[Compliance Auditor<br>12 Scheduled EventBridge Lambdas]
+        B[Fraud Monitor<br>S3 Streaming Lambda + Dynamic Isolation Forest]
     end
 
     subgraph "Shared Data Layer"
         C[(DynamoDB Findings Table<br>Single-Table Design)]
-        D[API Gateway + Lambda<br>Read-Only API Layer]
+        D[API Gateway + Lambda<br>Read-Only REST Layer]
     end
 
     subgraph "Frontend"
-        E[Next.js Web Dashboard<br>Tailwind CSS]
+        E[Next.js Web Dashboard<br>Tailwind CSS + Live Progress]
     end
     
-    F((SNS / SES<br>Critical Alerts))
+    F((SNS Alert Topic<br>Critical Dispatch))
 
     A -->|Writes Compliance Findings| C
     B -->|Writes Fraud Findings| C
-    B -->|Publishes CRITICAL| F
+    B -->|Publishes Critical Alerts| F
     
     C -->|Queried by| D
-    D -->|Feeds Data to| E
+    D -->|Feeds Telemetry to| E
 ```
 
-## 🚀 The Components
+---
 
-1. **Compliance Auditor (`/compliance-auditor`)**: A scheduled Lambda function that automatically evaluates this AWS account against 12 strict CIS AWS Foundations Benchmark controls (e.g., Root MFA, S3 Encryption, CloudTrail logging). 
-2. **Fraud Monitor (`/fraud-monitor`)**: A batch data pipeline that scans CSV transaction dumps. It applies simple heuristics (Velocity, High-Risk Merchants) and an **Isolation Forest** machine learning model to detect anomalies and calculate a Risk Score.
-3. **Shared API (`/api`)**: A lightweight, read-only "Lambda Lith" API Gateway that securely fetches paginated data and summary stats from DynamoDB.
-4. **Web Dashboard (`/frontend`)**: A React/Next.js interface allowing non-technical stakeholders to view the live health of the cloud infrastructure and recent fraudulent activity in one unified pane of glass.
+## 🚀 The Core Components
 
-## 🧠 Engineering Decisions & Challenges
+### 1. Compliance Auditor ([`/compliance-auditor`](compliance-auditor/README.md))
+A fleet of 12 scheduled AWS Lambda functions evaluating live AWS account configurations against the **CIS AWS Foundations Benchmark v3.0**:
+- **Identity & Access Management (IAM):** Root MFA enforcement, root active access key audits, IAM user console MFA, 90-day access key rotation, and direct admin policy restrictions.
+- **Storage & Encryption (S3 & EBS):** S3 bucket public access blocks, default S3 server-side encryption, and account-level default EBS volume encryption.
+- **Logging & Visibility (CloudTrail):** Multi-region CloudTrail audit logging and CloudTrail log file KMS encryption validation.
+- **Network Security (VPC Security Groups):** Unrestricted SSH (22) / RDP (3389) ingress checks and default security group traffic isolation.
 
-Why build it this way? See the [**Decisions Log**](docs/decisions.md) for a deep dive into the engineering tradeoffs made during this project, including:
-- Why we used a Single-Table DynamoDB design for two vastly different data shapes.
-- Why we chose an Isolation Forest over deep learning.
-- Why we used AWS SAM.
-- Why the API uses a "Lambda Lith" pattern.
+### 2. Fraud Monitor ([`/fraud-monitor`](fraud-monitor/README.md))
+A high-throughput serverless batch processing pipeline triggered automatically on S3 CSV uploads:
+- **Heuristic Rule Engine:** Evaluates velocity spikes, high-risk merchant categories (crypto exchanges, casinos, luxury goods), and abnormal amount deviations.
+- **Dynamic Isolation Forest ML:** Dynamically learns and fits an `IsolationForest` model on newly uploaded transaction batches containing PCA features (`V1`..`V28`), hot-reloading the model in memory to score outliers.
+- **Explainable Anomaly Telemetry:** Identifies and ranks the top PCA features driving high anomaly scores for clear auditability.
+- **Critical SNS Alerts:** Dispatches immediate notifications for transactions flagged by both heuristics and machine learning.
 
-What went wrong while building it? See the [**Challenges Log**](docs/challenges.md) for a candid look at the technical hurdles we faced, including:
-- Fighting the 250MB AWS Lambda limit with Machine Learning libraries.
-- Debugging S3 Presigned POST quirks across operating systems.
-- Calibrating Scikit-Learn IsolationForest anomaly thresholds.
-- Recovering from silent failures and artifact desynchronization.
+### 3. API Layer ([`/api`](api/README.md))
+A centralized "Lambda Lith" REST API serving the Next.js frontend:
+- **Endpoints:** `/overview-data`, `/findings`, `/findings/{id}`, `/processing-status/{id}`, and `/upload-url`.
+- **Security & Reliability:** Path traversal input sanitization, full DynamoDB scan/query pagination across 1MB limits, S3 Presigned POST ticket generation (supporting up to 1GB files), and CORS preflight handling.
 
-## 🛠️ How to run it
+### 4. Web Dashboard ([`/frontend`](frontend/README.md))
+A modern, dark-mode dashboard built with **Next.js** and **Tailwind CSS**:
+- **Unified Overview:** High-level telemetry cards for Critical/High fraud and compliance risks.
+- **Direct S3 Uploads:** In-browser XHR direct-to-S3 upload with real-time byte progress and backend AI job processing monitors.
+- **Fail-Safe UI:** Explicit error banners preventing false assurance during API downtime.
 
-Detailed setup instructions are inside each component's folder:
-- [Compliance Auditor Instructions](compliance-auditor/README.md)
-- [Fraud Monitor Instructions](fraud-monitor/README.md)
-- [API Layer Instructions](api/README.md)
-- [Frontend Dashboard Instructions](frontend/README.md)
+---
+
+## 🧠 Engineering Documentation
+
+- [**Decisions Log**](docs/decisions.md): Tradeoff analysis and architecture decisions made during construction (Single-Table design, Isolation Forest vs Deep Learning, SAM IaC, Dynamic Retraining).
+- [**Challenges Log**](docs/challenges.md): Technical hurdles encountered and resolved (Lambda 250MB ML packaging limits, S3 Presigned POST OS quirks, Isolation Forest mathematical calibration, and pagination).
+
+---
+
+## 🛠️ Setup & Deployment
+
+Detailed setup and deployment instructions are available in each component directory:
+- [Compliance Auditor Guide](compliance-auditor/README.md)
+- [Fraud Monitor Guide](fraud-monitor/README.md)
+- [API Layer Guide](api/README.md)
+- [Frontend Dashboard Guide](frontend/README.md)

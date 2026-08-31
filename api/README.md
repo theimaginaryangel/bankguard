@@ -1,28 +1,33 @@
 # API Layer
 
-Welcome to the API Layer! 🌐
+A lightweight, serverless REST API built with AWS API Gateway and a "Lambda Lith" Python handler (`src/app.py`). It mediates secure read access to the DynamoDB `Findings` table and generates presigned S3 upload tickets for the Next.js frontend dashboard.
 
-Think of our DynamoDB database as a highly secure vault. Our future website isn't allowed to reach directly into the vault. Instead, the website will talk to this **API** (a digital teller). The API safely fetches the data from the vault and hands it back to the website.
+---
 
-## How it works
+## 🌐 Endpoints & Operations
 
-This folder uses AWS SAM to create two things:
-1. **API Gateway**: This gives us a public URL (like `https://api.mybank.com`) that our website can talk to.
-2. **Lambda Function (`src/app.py`)**: A simple Python script that acts as our "teller". 
+| Method | Path | Description | Query Parameters / Body |
+|---|---|---|---|
+| `GET` | `/overview-data` | Aggregates all open findings by severity across both `COMPLIANCE` and `FRAUD` pipelines using paginated table scans. | None |
+| `GET` | `/findings` | Returns the 50 most recent findings sorted chronologically. | `?type=FRAUD` or `?type=COMPLIANCE` (defaults to `COMPLIANCE`) |
+| `GET` | `/findings/{id}` | Retrieves full audit detail for a specific finding. | `?type=FRAUD` or `?type=COMPLIANCE` |
+| `GET` | `/processing-status/{job_id}` | Checks S3 batch streaming byte progress and completion state. | URL path parameter `job_id` |
+| `POST` | `/upload-url` | Generates a secure S3 Presigned POST policy allowing direct in-browser upload of CSV batches up to 1GB. | Body: `{"filename": "transactions.csv"}` |
+| `OPTIONS`| `/*` | CORS preflight handler responding with allowed origins, headers, and HTTP methods. | None |
 
-To make it easy to read and learn from, we put all our logic into a single Python file (`app.py`). When a request comes in, the script acts like a traffic cop, checking the URL and deciding which helper function to run.
+---
 
-## The Commands (Endpoints)
+## 🔒 Security & Data Serialization
 
-Our API understands three commands:
+- **Path Traversal Sanitization:** Filenames supplied to `/upload-url` are sanitized with `os.path.basename()` and constrained to `.csv` formats within the `uploads/` S3 prefix.
+- **Recursive DynamoDB Deserialization:** The `clean_dynamo_item()` utility recursively unwraps DynamoDB typed attributes (`S`, `N`, `M`, `L`, `BOOL`, `NULL`) into clean JSON for frontend consumption.
+- **Scan & Query Pagination:** Uses `ExclusiveStartKey` pagination loops to ensure complete dataset coverage beyond DynamoDB's default 1MB response limit.
 
-1. `GET /findings?type=FRAUD`
-   - Returns a list of the 50 most recent fraud alerts so the website can show them in a table.
-2. `GET /findings/12345?type=FRAUD`
-   - Returns the full details of a *single* specific alert so the website can show a detailed view.
-3. `GET /stats/summary`
-   - Counts up all our open alerts (e.g., "5 Critical Frauds") so the website can show dashboard summary cards at the top of the screen.
+---
 
-## Note on DynamoDB
+## 🚀 Deployment
 
-DynamoDB returns data in a clunky format (e.g. `{"severity": {"S": "HIGH"}}`). Inside `app.py`, you'll notice a helper function called `clean_dynamo_item()` that translates this back into normal JSON so our Next.js website doesn't have to deal with it!
+```bash
+sam deploy --resolve-s3 --capabilities CAPABILITY_IAM CAPABILITY_NAMED_IAM
+```
+

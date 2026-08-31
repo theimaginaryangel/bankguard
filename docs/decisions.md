@@ -69,3 +69,27 @@ Written as decisions are made, not reconstructed afterward. Each entry: what was
 **Decision:** Retain AWS SAM as the sole IaC tool, skipping the planned Phase 5 Terraform migration.
 
 **Why:** The portfolio already contains robust demonstrations of Terraform in other projects. Migrating this specific project to Terraform would add redundant proof of skill while unnecessarily duplicating the infrastructure configuration. SAM remains the perfect, idiomatic choice for a heavily Serverless architecture.
+
+---
+
+## 2026-08 — Dynamic Online ML Retraining over Static Offline Models
+
+**Decision:** Retrain the Isolation Forest model in memory on each uploaded batch (when PCA features are present) and cache the updated model in Lambda's `/tmp/` directory, rather than strictly relying on a static, pre-packaged `.joblib` file.
+
+**Why:** In real financial environments, transaction distributions and variance scales vary significantly across different portfolios and time periods. Fitting the Isolation Forest dynamically to the uploaded transaction distribution ensures anomaly detection remains calibrated to the uploaded dataset's specific baseline, while caching to `/tmp/` provides hot-reloaded persistence across subsequent Lambda warm invocations.
+
+---
+
+## 2026-08 — S3 Presigned POST for Direct Browser-to-Cloud Uploads
+
+**Decision:** Implement an S3 Presigned POST ticket mechanism (`/upload-url`) allowing the Next.js browser client to stream datasets directly to S3 via XHR, bypassing API Gateway.
+
+**Why:** AWS API Gateway has a strict 10MB payload limit, and base64-encoding CSV files over HTTP Lambda integrations consumes substantial memory and network bandwidth. Using presigned POST allows our application to support large batch datasets (up to 1GB) with client-side byte progress tracking, zero API compute bottlenecks, and automated S3 event-driven Lambda execution.
+
+---
+
+## 2026-08 — Eliminating False Assurance in Security Dashboards
+
+**Decision:** Implement explicit error boundaries and failure banners across the frontend rather than falling back to default empty states (`0` risks or empty tables).
+
+**Why:** In cybersecurity and fraud telemetry, an unavailable backend API must never be rendered as "0 Critical Risks" or "Infrastructure Secure". Defaulting to zero on connection failure provides dangerous false assurance to operators. Surfacing explicit error states with manual retry capabilities maintains operational integrity.

@@ -4,20 +4,20 @@ Scheduled Lambda checks against this AWS account, evaluated against a curated se
 
 ## Checks implemented
 
-| Check ID | Description | Severity | Status |
-|---|---|---|---|
-| CIS-1.2 | Root account has MFA enabled | CRITICAL | ✅ Implemented |
-| CIS-1.1 | Root account has no active access keys | CRITICAL | ⬜ Not yet built |
-| CIS-1.3 | IAM console users have MFA enabled | HIGH | ⬜ |
-| CIS-1.4 | IAM access keys rotated within 90 days | MEDIUM | ⬜ |
-| CIS-1.5 | No `*:*` admin policies attached directly to users | HIGH | ⬜ |
-| CIS-2.1 | S3 buckets not publicly readable/writable | CRITICAL | ⬜ |
-| CIS-2.2 | S3 buckets encrypted at rest | MEDIUM | ⬜ |
-| CIS-2.3 | CloudTrail enabled in all regions | HIGH | ⬜ |
-| CIS-2.4 | CloudTrail logs encrypted | MEDIUM | ⬜ |
-| CIS-3.1 | No unrestricted ingress on 22/3389 | CRITICAL | ⬜ |
-| CIS-3.2 | Default security group restricts all traffic | MEDIUM | ⬜ |
-| CIS-4.1 | EBS volumes encrypted | MEDIUM | ⬜ |
+| Check ID | Description | Severity | Target Resource / API | Status |
+|---|---|---|---|---|
+| CIS-1.1 | Root account has no active access keys | CRITICAL | `iam:GetAccountSummary` | ✅ Implemented |
+| CIS-1.2 | Root account has MFA enabled | CRITICAL | `iam:GetAccountSummary` | ✅ Implemented |
+| CIS-1.3 | IAM console users have MFA enabled | HIGH | `iam:ListUsers` / `iam:ListMFADevices` | ✅ Implemented |
+| CIS-1.4 | IAM access keys rotated within 90 days | MEDIUM | `iam:ListAccessKeys` | ✅ Implemented |
+| CIS-1.5 | No `*:*` admin policies attached directly to users | HIGH | `iam:ListUserPolicies` / `iam:ListAttachedUserPolicies` | ✅ Implemented |
+| CIS-2.1 | S3 buckets not publicly readable/writable | CRITICAL | `s3:GetPublicAccessBlock` | ✅ Implemented |
+| CIS-2.2 | S3 buckets encrypted at rest | MEDIUM | `s3:GetBucketEncryption` | ✅ Implemented |
+| CIS-2.3 | CloudTrail enabled in all regions | HIGH | `cloudtrail:DescribeTrails` | ✅ Implemented |
+| CIS-2.4 | CloudTrail logs encrypted with KMS | MEDIUM | `cloudtrail:GetTrailStatus` | ✅ Implemented |
+| CIS-3.1 | No unrestricted ingress on ports 22 / 3389 | CRITICAL | `ec2:DescribeSecurityGroups` | ✅ Implemented |
+| CIS-3.2 | Default security group restricts all traffic | MEDIUM | `ec2:DescribeSecurityGroups` | ✅ Implemented |
+| CIS-4.1 | EBS volumes encrypted by default | MEDIUM | `ec2:GetEbsEncryptionByDefault` | ✅ Implemented |
 
 Each check is a small, independent Lambda under `src/checks/`, sharing the finding-writer in `src/common/findings.py`. A check only writes a row when it fails — passing checks stay silent, so the table reflects issues, not a full audit trail (add a separate pass/fail counter later if a "coverage" stat is wanted on the frontend).
 

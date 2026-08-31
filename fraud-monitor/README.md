@@ -1,35 +1,52 @@
 # Fraud Monitor
 
-Welcome to the Fraud Monitor! 🕵️‍♂️
+A serverless transactional anomaly detection pipeline that combines heuristic rule checks with an **Isolation Forest** machine learning model capable of **dynamic online retraining** directly inside AWS Lambda.
 
-This folder contains the code for a system that catches suspicious credit card transactions. 
+---
 
-## How It Works
+## 🕵️‍♂️ How It Works
 
-Imagine a bucket (an AWS S3 Bucket) sitting in the cloud. Every day, a bank drops a file (a CSV) full of yesterday's transactions into this bucket.
+1. **Ingestion Trigger:** A batch CSV containing credit card transactions is uploaded directly to the S3 bucket (`TransactionBatchesBucket`).
+2. **Lambda Processor (`src/handler.py`):**
+   - Wipes historical findings with DynamoDB pagination to provide clean batch reporting.
+   - Streams the CSV file to track byte progress and write updates to DynamoDB under `JOB_PROGRESS`.
+   - **Dynamic Online Retraining:** If PCA features (`V1`–`V28`) are present in the batch, `retrain_model()` in `src/model/inference.py` fits a fresh `IsolationForest` on the uploaded distribution, persists it to `/tmp/`, and hot-reloads it in memory.
+3. **Dual-Layer Evaluation:**
+   - **Rule Engine (`src/rules/engine.py`):** Flags high transaction amounts (>$1,000), high-risk merchants (`crypto_exchange`, `jewelry`, `casino`, `wire_transfer`, `electronics_wholesale`), and velocity spikes (>5 recent transactions).
+   - **AI Anomaly Detection (`src/model/inference.py`):** Calculates an explainable Risk Score (0.0 to 1.0) and isolates top contributing PCA features.
+4. **Findings & Alerts:**
+   - Evaluated records with risk scores $\ge 0.40$ or triggered rules are written to DynamoDB `Findings` with chronological sort keys.
+   - Dual-flagged findings (both AI anomaly and rule triggers) are assigned **CRITICAL** severity and published immediately to the **SNS Alert Topic**.
 
-When the file drops, it wakes up our "worker" (an AWS Lambda Function). The worker reads the file line by line and runs every transaction through two tests:
+---
 
-1. **The Rule Engine (`src/rules/engine.py`)**: These are simple, fast rules. For example: "Did they spend over $1,000?" or "Did they buy from a sketchy jewelry store?"
-2. **The AI Model (`src/model/inference.py`)**: This is our "Isolation Forest". It's a machine learning algorithm that has looked at millions of transactions and learned what "normal" looks like. If a transaction looks weird (an anomaly), it flags it with a Risk Score.
+## 🤖 Why Isolation Forest & Dynamic Online Learning?
 
-If a transaction fails either test, the worker grabs a notepad (our DynamoDB `Findings` table) and writes it down. If it fails *both* tests, it grabs a megaphone (an SNS Topic) and shouts "CRITICAL ALERT!" so an investigator can look at it immediately.
+- **Unsupervised Anomaly Isolation:** Normal transactions cluster closely in feature space, while fraudulent patterns partition with shallow tree depths. Isolation Forest isolates anomalies without requiring imbalanced supervised labels.
+- **Dynamic Online Retraining:** Rather than relying on a static offline model that suffers from distribution drift, the Lambda automatically fits to the specific variance and column scale of the uploaded portfolio before scoring.
+- **Explainability:** When an anomaly is detected, the top 3 feature deviations are ranked and saved alongside the finding, providing investigators with clear context behind the AI score.
 
-## Why Isolation Forest?
+---
 
-Machine learning can be complicated, but Isolation Forest is beautifully simple. 
+## 💻 Local Setup & Testing
 
-Imagine a forest of trees. Most trees look exactly the same and are clumped closely together. But one tree has bright purple leaves and stands all by itself. It's very easy to draw a fence around that single tree to **isolate** it. 
+```bash
+# Navigate to fraud-monitor directory
+cd fraud-monitor
 
-The algorithm does exactly this with data. If a transaction is very easy to isolate from the rest of the data, it's considered an anomaly (fraud!).
+# Optional: Train a local reference model
+python src/model/prep_data.py
+python src/model/train.py
 
-## How to Test It Locally
+# Test invocation with SAM Local
+sam local invoke FraudBatchProcessorFunction -e events/s3_upload_event.json
+```
 
-Because the real-world dataset from Kaggle doesn't have merchant names or account IDs (it's anonymized for privacy), we need to add fake ones so our Rule Engine works.
+---
 
-1. Download the [Kaggle Credit Card Fraud dataset](https://www.kaggle.com/datasets/mlg-ulb/creditcardfraud).
-2. Save it inside the `src/model/` folder as `creditcard.csv`.
-3. Open your terminal, go to `src/model/`, and run `python prep_data.py`. This creates a new file called `creditcard_augmented.csv` with fake merchants and account IDs.
-4. Run `python train.py`. This will teach the AI what normal looks like, and save its "brain" into `model.joblib`. 
+## 🚀 Deployment
 
-When you deploy this using AWS SAM, the AWS Lambda function will load that brain and use it on new files!
+```bash
+sam deploy --resolve-s3 --capabilities CAPABILITY_IAM CAPABILITY_NAMED_IAM
+```
+

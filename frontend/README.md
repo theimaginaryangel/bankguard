@@ -1,33 +1,44 @@
-# BankGuard Frontend
+# BankGuard Web Dashboard
 
-Welcome to the Next.js Frontend! 🖥️
+A responsive, dark-mode web interface built with **Next.js** and **Tailwind CSS** providing unified security posture and transactional fraud telemetry for operators and auditors.
 
-This is the web dashboard that recruiters or auditors will look at. It acts as a window into our database, showing us all the hard work our Compliance Auditor and Fraud Monitor have been doing in the background.
+---
 
-## How it works
+## 🖥️ Pages & Features
 
-This is a **Next.js** application built with **Tailwind CSS**. To keep the code beginner-friendly and easy to read:
-- All the styling is done right inside the HTML (using Tailwind classes like `bg-blue-500`).
-- We don't use complex state management (like Redux). We just use simple React `useEffect` hooks to fetch data when the page loads.
-- The data is fetched from our API Layer. The API URLs are managed in `src/lib/api.ts`.
+- **`/` (System Overview):** Real-time severity summary counters for Critical and High findings across Compliance and Fraud pipelines, accompanied by architecture walkthrough links.
+- **`/compliance` (Compliance Findings):** Automated audit view against the 12 CIS AWS Foundations Benchmark controls, showing failing control IDs, severity badges, affected resource identifiers, and actionable remediation steps.
+- **`/fraud` (Fraud Monitor):** 
+  - **S3 Direct Batch Upload:** In-browser XHR upload zone supporting CSV files up to 1GB with real-time percentage progress bars.
+  - **Demo Dataset Downloader:** One-click download of a pre-formatted Kaggle-style CSV containing synthetic PCA feature variations and known anomalies.
+  - **Live Processing Monitor:** Polls backend Lambda byte stream progress and model retraining status via `/processing-status/{id}`.
+  - **Explainable Findings Table:** Displays flagged transaction IDs, risk score progress bars, triggered heuristic rules, and top contributing PCA deviations.
+- **`/architecture` (System Architecture):** Detailed architectural blueprints explaining how DynamoDB single-table design, serverless workers, and REST endpoints converge.
 
-## How to run it locally
+---
 
-1. Open your terminal and go to this `frontend` folder.
-2. Install the required packages by running:
-   ```bash
-   npm install
-   ```
-3. Start the development server by running:
-   ```bash
-   npm run dev
-   ```
-4. Open your web browser and go to [http://localhost:3000](http://localhost:3000).
+## ⚙️ Environment Configuration
 
-*(Note: If the API isn't deployed yet, the dashboard will still load, but the tables will be empty!)*
+Create a `.env.local` file inside `frontend/` (or rely on production defaults in `src/lib/api.ts`):
 
-## Pages Included
-- **`/` (Overview):** Shows big summary numbers and an explanation of the dashboard.
-- **`/compliance`:** A table of all the CIS security configuration alerts.
-- **`/fraud`:** A table of the suspicious credit card transactions caught by our rules and AI.
-- **`/architecture`:** A plain-English explanation of how the whole system works together in the cloud.
+```env
+NEXT_PUBLIC_API_URL=https://<api-id>.execute-api.us-east-1.amazonaws.com/Prod
+```
+
+---
+
+## 🛠️ Local Development
+
+```bash
+# Navigate to frontend directory
+cd frontend
+
+# Install dependencies
+npm install
+
+# Start development server
+npm run dev
+```
+
+Open [http://localhost:3000](http://localhost:3000) in your browser.
+
