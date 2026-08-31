@@ -11,27 +11,29 @@ Every metric and alert shown on the dashboard reflects real AWS API audits and b
 ## 🏗️ Architecture at a Glance
 
 ```mermaid
-graph TD
-    subgraph "Backend Pipelines (AWS SAM)"
-        A[Compliance Auditor<br>12 Scheduled EventBridge Lambdas]
-        B[Fraud Monitor<br>S3 Streaming Lambda + Dynamic Isolation Forest]
+flowchart TB
+    subgraph Backend ["Backend Pipelines (AWS SAM)"]
+        direction TB
+        A["Compliance Auditor<br>12 Scheduled EventBridge Lambdas"]
+        B["Fraud Monitor<br>S3 Streaming Lambda + Dynamic Isolation Forest"]
     end
 
-    subgraph "Shared Data Layer"
-        C[(DynamoDB Findings Table<br>Single-Table Design)]
-        D[API Gateway + Lambda<br>Read-Only REST Layer]
+    subgraph DataLayer ["Shared Data Layer"]
+        direction TB
+        C[("DynamoDB Findings Table<br>Single-Table Design")]
+        D["API Gateway + Lambda<br>Read-Only REST Layer"]
     end
 
-    subgraph "Frontend"
-        E[Next.js Web Dashboard<br>Tailwind CSS + Live Progress]
+    subgraph Client ["Frontend"]
+        direction TB
+        E["Next.js Web Dashboard<br>Tailwind CSS + Live Progress"]
     end
-    
-    F((SNS Alert Topic<br>Critical Dispatch))
+
+    F["SNS Alert Topic<br>Critical Notifications"]
 
     A -->|Writes Compliance Findings| C
     B -->|Writes Fraud Findings| C
     B -->|Publishes Critical Alerts| F
-    
     C -->|Queried by| D
     D -->|Feeds Telemetry to| E
 ```
@@ -69,6 +71,7 @@ A modern, dark-mode dashboard built with **Next.js** and **Tailwind CSS**:
 
 ## 🧠 Engineering Documentation
 
+- [**Plain-English Deep Dive Guide**](docs/bankguard_explained.md): A comprehensive, easy-to-understand breakdown of every component, algorithm, and cloud architecture decision.
 - [**Decisions Log**](docs/decisions.md): Tradeoff analysis and architecture decisions made during construction (Single-Table design, Isolation Forest vs Deep Learning, SAM IaC, Dynamic Retraining).
 - [**Challenges Log**](docs/challenges.md): Technical hurdles encountered and resolved (Lambda 250MB ML packaging limits, S3 Presigned POST OS quirks, Isolation Forest mathematical calibration, and pagination).
 
